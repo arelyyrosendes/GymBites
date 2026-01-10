@@ -1,0 +1,195 @@
+:root {
+  --bg: #0b0d12;
+  --card: #111525;
+  --card2: #0f1320;
+  --text: #e9ecf6;
+  --muted: rgba(233, 236, 246, 0.65);
+  --border: rgba(233, 236, 246, 0.12);
+  --accent: #6ea8fe;
+  --danger: #ff6b6b;
+
+  color: var(--text);
+  background: var(--bg);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+.appShell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.appContent {
+  flex: 1;
+  padding-bottom: 78px; /* space for bottom nav */
+}
+
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 20px 16px;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  font-size: 28px;
+}
+.pageHeader p {
+  margin: 6px 0 0;
+}
+
+.card {
+  background: linear-gradient(180deg, var(--card), var(--card2));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.subCard {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.stack { display: grid; gap: 10px; }
+.grid2 { display: grid; gap: 12px; grid-template-columns: 1fr; margin-top: 12px; }
+.grid4 { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+
+@media (min-width: 860px) {
+  .grid2 { grid-template-columns: 1fr 1fr; }
+  .grid4 { grid-template-columns: repeat(4, 1fr); }
+}
+
+.row { display: flex; gap: 10px; align-items: end; }
+.rowBetween { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.field { display: grid; gap: 6px; width: 100%; }
+
+.label { font-size: 12px; color: var(--muted); }
+.input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+  color: var(--text);
+  outline: none;
+}
+.input:focus { border-color: rgba(110,168,254,0.55); }
+
+.btn {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(110,168,254,0.35);
+  background: rgba(110,168,254,0.16);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover { border-color: rgba(110,168,254,0.7); }
+
+.btnGhost {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.btnGhost:hover { color: var(--text); }
+
+.btnDanger {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,107,107,0.35);
+  background: rgba(255,107,107,0.14);
+  color: var(--text);
+  cursor: pointer;
+}
+.btnDanger:hover { border-color: rgba(255,107,107,0.7); }
+
+.itemRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+}
+.itemTitle { font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 0;
+}
+
+.totalsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.selectRow {
+  text-align: left;
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  padding: 10px 12px;
+  cursor: pointer;
+}
+.selectRow.selected {
+  border-color: rgba(110,168,254,0.55);
+  background: rgba(110,168,254,0.10);
+}
+
+.pill {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+/* Bottom nav */
+.bottomNav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 64px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(8, 10, 14, 0.85);
+  border-top: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+
+.navItem {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 10px 6px;
+}
+.navItem.active {
+  color: var(--text);
+}
+.navLabel {
+  display: inline-block;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 999px;
+}
+.navItem.active .navLabel {
+  background: rgba(110,168,254,0.16);
+  border: 1px solid rgba(110,168,254,0.35);
+}
