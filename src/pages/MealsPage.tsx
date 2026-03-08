@@ -1,10 +1,10 @@
 import { useMemo, useState, type JSX } from "react";
-import { useLocalDB } from "../hooks/useLocalDB";
+import { useRemoteDB } from "../hooks/useRemoteDB";
 import { uid, todayISO, clampNumber } from "../utils";
 import type { Recipe } from "../types";
 
 export default function MealsPage(): JSX.Element {
-  const { db, setDb } = useLocalDB();
+  const { db, setDb, loading } = useRemoteDB();
   const [date, setDate] = useState(todayISO());
 
   const [name, setName] = useState("");
@@ -54,6 +54,14 @@ export default function MealsPage(): JSX.Element {
   };
 
   const plannedIds = new Set(dayEntry?.recipeIds ?? []);
+
+  if (loading) {
+    return (
+      <div className="page">
+        <p className="muted">Syncing your meals…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="page">

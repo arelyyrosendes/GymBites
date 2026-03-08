@@ -1,4 +1,6 @@
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, type JSX } from "react";
+
 import CalendarPage from "./pages/CalendarPage.tsx";
 import WorkoutLogPage from "./pages/WorkoutLogPage";
 import MealsPage from "./pages/MealsPage";
@@ -7,7 +9,6 @@ import LoginPage from "./pages/LoginPage";
 import CreateAccountPage from "./pages/CreateAccountPage";
 import BottomNav from "./components/BottomNav";
 import { useAuth } from "./contexts/AuthContext";
-import type { JSX } from "react";
 
 function RequireAuth({ children }: { children: JSX.Element }): JSX.Element {
   const { user, initializing } = useAuth();
@@ -15,8 +16,12 @@ function RequireAuth({ children }: { children: JSX.Element }): JSX.Element {
 
   if (initializing) {
     return (
-      <div className="page">
-        <p className="muted">Checking your session…</p>
+      <div className="appShell">
+        <div className="appContent">
+          <div className="page">
+            <p className="muted">Checking your account…</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -28,29 +33,72 @@ function RequireAuth({ children }: { children: JSX.Element }): JSX.Element {
   return children;
 }
 
-export default function App(): JSX.Element {
-  const location = useLocation();
-  const navigate = useNavigate();
+function PublicOnly({ children }: { children: JSX.Element }): JSX.Element {
   const { user, initializing } = useAuth();
-
-  const tabs = [
-    { label: "Today", path: "/calendar" },
-    { label: "Workouts", path: "/workouts" },
-    { label: "Meals", path: "/meals" },
-    { label: "Account", path: "/account" },
-  ];
-
-  const activeIndex = Math.max(
-    0,
-    tabs.findIndex((t) => location.pathname.startsWith(t.path))
-  );
 
   if (initializing) {
     return (
       <div className="appShell">
         <div className="appContent">
           <div className="page">
-            <p className="muted">Loading…</p>
+            <p className="muted">Loading your app…</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Navigate to="/calendar" replace />;
+  }
+
+  return children;
+}
+
+export default function App(): JSX.Element {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, initializing } = useAuth();
+
+  const tabs = [
+    { label: "Dashboard", path: "/calendar" },
+    { label: "Workouts", path: "/workouts" },
+    { label: "Meals", path: "/meals" },
+    { label: "Profile", path: "/account" },
+  ];
+
+  const mainAppPaths = ["/calendar", "/workouts", "/meals", "/account"];
+
+  const showBottomNav =
+    !!user && mainAppPaths.some((path) => location.pathname.startsWith(path));
+
+  const activeIndex = Math.max(
+    0,
+    tabs.findIndex((tab) => location.pathname.startsWith(tab.path))
+  );
+
+  useEffect(() => {
+    const titleMap: Record<string, string> = {
+      "/calendar": "GymBites • Dashboard",
+      "/workouts": "GymBites • Workouts",
+      "/meals": "GymBites • Meals",
+      "/account": "GymBites • Profile",
+      "/login": "GymBites • Login",
+      "/create-account": "GymBites • Create Account",
+    };
+
+    const matchedPath =
+      Object.keys(titleMap).find((path) => location.pathname.startsWith(path)) ?? "";
+
+    document.title = matchedPath ? titleMap[matchedPath] : "GymBites";
+  }, [location.pathname]);
+
+  if (initializing) {
+    return (
+      <div className="appShell">
+        <div className="appContent">
+          <div className="page">
+            <p className="muted">Loading GymBites…</p>
           </div>
         </div>
       </div>
@@ -61,9 +109,29 @@ export default function App(): JSX.Element {
     <div className="appShell">
       <div className="appContent">
         <Routes>
-          <Route path="/" element={<Navigate to={user ? "/calendar" : "/login"} replace />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/create-account" element={<CreateAccountPage />} />
+          <Route
+            path="/"
+            element={<Navigate to={user ? "/calendar" : "/login"} replace />}
+          />
+
+          <Route
+            path="/login"
+            element={
+              <PublicOnly>
+                <LoginPage />
+              </PublicOnly>
+            }
+          />
+
+          <Route
+            path="/create-account"
+            element={
+              <PublicOnly>
+                <CreateAccountPage />
+              </PublicOnly>
+            }
+          />
+
           <Route
             path="/calendar"
             element={
@@ -72,6 +140,7 @@ export default function App(): JSX.Element {
               </RequireAuth>
             }
           />
+
           <Route
             path="/workouts"
             element={
@@ -80,6 +149,7 @@ export default function App(): JSX.Element {
               </RequireAuth>
             }
           />
+
           <Route
             path="/meals"
             element={
@@ -88,6 +158,7 @@ export default function App(): JSX.Element {
               </RequireAuth>
             }
           />
+
           <Route
             path="/account"
             element={
@@ -96,10 +167,15 @@ export default function App(): JSX.Element {
               </RequireAuth>
             }
           />
-          <Route path="*" element={<Navigate to={user ? "/calendar" : "/login"} replace />} />
+
+          <Route
+            path="*"
+            element={<Navigate to={user ? "/calendar" : "/login"} replace />}
+          />
         </Routes>
       </div>
-      {user ? (
+
+      {showBottomNav ? (
         <BottomNav
           items={tabs}
           activeIndex={activeIndex}

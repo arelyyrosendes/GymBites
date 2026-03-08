@@ -1,9 +1,9 @@
 import { useState, type JSX } from "react";
-import { useLocalDB } from "../hooks/useLocalDB";
+import { useRemoteDB } from "../hooks/useRemoteDB";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function AccountPage(): JSX.Element {
-  const { db, setDb } = useLocalDB();
+  const { db, setDb } = useRemoteDB();
   const { user, signOutUser } = useAuth();
   const [displayName, setDisplayName] = useState(db.account.displayName ?? "");
   const [goal, setGoal] = useState(db.account.goal ?? "");
@@ -30,9 +30,7 @@ export default function AccountPage(): JSX.Element {
       <header className="pageHeader">
         <div>
           <h1>Account</h1>
-          <p className="muted">
-            Signed in as {user?.email ?? "unknown"} • Settings + profile (local-only for now)
-          </p>
+          <p className="muted">Signed in as {user?.email ?? "unknown"} • Settings + profile</p>
         </div>
         <button className="btnGhost" onClick={() => void signOutUser()}>
           Log out

@@ -1,10 +1,10 @@
 import { useMemo, useState, type JSX } from "react";
-import { useLocalDB } from "../hooks/useLocalDB";
+import { useRemoteDB } from "../hooks/useRemoteDB";
 import { uid, todayISO, clampNumber } from "../utils";
 import type { DayWorkoutEntry, WorkoutSection, WorkoutSubSection } from "../types";
 
 export default function WorkoutLogPage(): JSX.Element {
-  const { db, setDb } = useLocalDB();
+  const { db, setDb, loading } = useRemoteDB();
   const [date, setDate] = useState(todayISO());
 
   const entry = useMemo(() => {
@@ -96,6 +96,14 @@ export default function WorkoutLogPage(): JSX.Element {
       ),
     }));
   };
+
+  if (loading) {
+    return (
+      <div className="page">
+        <p className="muted">Syncing your workouts…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="page">
