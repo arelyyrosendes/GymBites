@@ -101,6 +101,7 @@ type DayMealDisplayItem = {
 export default function CalendarPage(): JSX.Element {
   const { db, setDb, loading } = useRemoteDB();
   const [date, setDate] = useState(todayISO());
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
   const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
   const [workoutModalStep, setWorkoutModalStep] = useState<"select" | "edit">("select");
@@ -544,39 +545,56 @@ export default function CalendarPage(): JSX.Element {
                 <div key={section.id} className="entryCard">
                   <div className="entryHeaderRow">
                     <h3>{section.name}</h3>
-                    <button
-                      type="button"
-                      className="ghostDangerButton iconOnly"
-                      onClick={() => removeSectionFromDay(section.id)}
-                      aria-label="Remove section"
-                    >
-                      –
-                    </button>
+                    <div className="row" style={{ alignItems: "center", gap: 8 }}>
+                      <button
+                        type="button"
+                        className="btnGhost"
+                        onClick={() =>
+                          setCollapsedSections((prev) => ({
+                            ...prev,
+                            [section.id]: !prev[section.id],
+                          }))
+                        }
+                        aria-label={collapsedSections[section.id] ? "Show section" : "Hide section"}
+                      >
+                        {collapsedSections[section.id] ? "▼" : "▲"}
+                      </button>
+                      <button
+                        type="button"
+                        className="ghostDangerButton iconOnly"
+                        onClick={() => removeSectionFromDay(section.id)}
+                        aria-label="Remove section"
+                      >
+                        –
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="exerciseList">
-                    {(section.exercises ?? []).map((exercise) => (
-                      <div key={exercise.id} className="exerciseBlock">
-                        <strong>{exercise.name}</strong>
+                  {!collapsedSections[section.id] ? (
+                    <div className="exerciseList">
+                      {(section.exercises ?? []).map((exercise) => (
+                        <div key={exercise.id} className="exerciseBlock">
+                          <strong>{exercise.name}</strong>
 
-                        {(exercise.sets ?? []).length === 0 ? (
-                          <div className="muted small" style={{ marginTop: 6 }}>
-                            No sets added yet
-                          </div>
-                        ) : (
-                          <div className="setList">
-                            {(exercise.sets ?? []).map((setItem, index) => (
-                              <div key={setItem.id} className="setRow">
-                                <span className="muted">
-                                  Set {index + 1}: {setItem.weight} lb × {setItem.reps} reps
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          {(exercise.sets ?? []).length === 0 ? (
+                            <div className="muted small" style={{ marginTop: 6 }}>
+                              No sets added yet
+                            </div>
+                          ) : (
+                            <div className="setList">
+                              {(exercise.sets ?? []).map((setItem, index) => (
+                                <div key={setItem.id} className="setRow">
+                                  <span className="muted">
+                                    Set {index + 1}: {setItem.weight} lb × {setItem.reps} reps
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

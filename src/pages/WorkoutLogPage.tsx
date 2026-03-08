@@ -5,6 +5,7 @@ import type { GeneralExercise, GeneralWorkout } from "../types";
 
 export default function WorkoutLogPage(): JSX.Element {
   const { db, setDb, loading } = useRemoteDB();
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
   const addSection = (name: string) => {
     const clean = name.trim();
@@ -100,10 +101,23 @@ export default function WorkoutLogPage(): JSX.Element {
                     {(section.exercises ?? []).length} exercise(s)
                   </p>
                 </div>
+                <div className="row" style={{ alignItems: "center", gap: 8 }}>
+                  <button
+                    className="btnGhost"
+                    onClick={() =>
+                      setCollapsedSections((prev) => ({
+                        ...prev,
+                        [section.id]: !prev[section.id],
+                      }))
+                    }
+                  >
+                    {collapsedSections[section.id] ? "▼" : "▲"}
+                  </button>
 
-                <button className="btnGhost" onClick={() => removeSection(section.id)}>
-                  Remove
-                </button>
+                  <button className="btnGhost" onClick={() => removeSection(section.id)}>
+                    Remove
+                  </button>
+                </div>
               </div>
 
               <div className="divider" />
@@ -114,28 +128,30 @@ export default function WorkoutLogPage(): JSX.Element {
                 onAdd={(name) => addExercise(section.id, name)}
               />
 
-              {(section.exercises ?? []).length === 0 ? (
-                <p className="muted small">No exercises yet.</p>
-              ) : (
-                <div className="stack">
-                  {(section.exercises ?? []).map((exercise) => (
-                    <div key={exercise.id} className="subCard">
-                      <div className="rowBetween">
-                        <div>
-                          <div className="itemTitle">{exercise.name}</div>
-                        </div>
+              {!collapsedSections[section.id] ? (
+                (section.exercises ?? []).length === 0 ? (
+                  <p className="muted small">No exercises yet.</p>
+                ) : (
+                  <div className="stack">
+                    {(section.exercises ?? []).map((exercise) => (
+                      <div key={exercise.id} className="subCard">
+                        <div className="rowBetween">
+                          <div>
+                            <div className="itemTitle">{exercise.name}</div>
+                          </div>
 
-                        <button
-                          className="btnGhost"
-                          onClick={() => removeExercise(section.id, exercise.id)}
-                        >
-                          Remove
-                        </button>
+                          <button
+                            className="btnGhost"
+                            onClick={() => removeExercise(section.id, exercise.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )
+              ) : null}
             </div>
           ))
         )}
