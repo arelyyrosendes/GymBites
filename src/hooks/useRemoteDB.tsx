@@ -6,13 +6,28 @@ import {
   useMemo,
   useState,
   type ReactNode,
+  type JSX,
 } from "react";
-import { doc, getDoc, getFirestore, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  getFirestore,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext";
-import type { Account, DayMealEntry, DayWorkoutEntry, Recipe } from "../types";
+import type {
+  Account,
+  DayMealEntry,
+  DayWorkoutEntry,
+  Recipe,
+  WorkoutSection,
+} from "../types";
 
 type DB = {
   workouts: DayWorkoutEntry[];
+  workoutSections: WorkoutSection[];
   mealsByDay: DayMealEntry[];
   recipes: Recipe[];
   account: Account;
@@ -20,6 +35,7 @@ type DB = {
 
 const defaultDB: DB = {
   workouts: [],
+  workoutSections: [],
   mealsByDay: [],
   recipes: [],
   account: { displayName: "User" },
@@ -34,16 +50,42 @@ type RemoteDBContextValue = {
 
 const RemoteDBContext = createContext<RemoteDBContextValue | undefined>(undefined);
 
+function normalizeWorkoutSection(section: Partial<WorkoutSection>): WorkoutSection {
+  return {
+    id: section.id ?? `section-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: section.name ?? "Untitled Section",
+    exercises: (section.exercises ?? []).map((exercise) => ({
+      id: exercise.id ?? `exercise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: exercise.name ?? "Unnamed Exercise",
+      sets: (exercise.sets ?? []).map((setItem) => ({
+        id: setItem.id ?? `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        weight: typeof setItem.weight === "number" ? setItem.weight : 0,
+        reps: typeof setItem.reps === "number" ? setItem.reps : 0,
+      })),
+    })),
+  };
+}
+
+function normalizeWorkoutEntry(entry: Partial<DayWorkoutEntry>): DayWorkoutEntry {
+  return {
+    id: entry.id ?? `workout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    date: entry.date ?? "",
+    notes: entry.notes ?? "",
+    sections: (entry.sections ?? []).map(normalizeWorkoutSection),
+  };
+}
+
 function useProvideRemoteDB(): RemoteDBContextValue {
   const { user } = useAuth();
   const firestore = getFirestore();
   const [db, setDbState] = useState<DB>(defaultDB);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Stable doc ref so the effect doesn't resubscribe every render.
-  const docRef = useMemo(() => (user ? doc(firestore, "users", user.uid) : null), [firestore, user?.uid]);
+  const docRef = useMemo(
+    () => (user ? doc(firestore, "users", user.uid) : null),
+    [firestore, user?.uid]
+  );
 
-  // Subscribe once per user to Firestore changes
   useEffect(() => {
     if (!docRef) {
       setDbState(defaultDB);
@@ -52,16 +94,19 @@ function useProvideRemoteDB(): RemoteDBContextValue {
     }
 
     setLoading(true);
+
     const unsub = onSnapshot(
       docRef,
       (snap) => {
         if (snap.exists()) {
           const data = snap.data() as Partial<DB>;
+
           setDbState({
             ...defaultDB,
             ...data,
             account: { ...defaultDB.account, ...(data.account ?? {}) },
-            workouts: data.workouts ?? [],
+            workouts: (data.workouts ?? []).map(normalizeWorkoutEntry),
+            workoutSections: (data.workoutSections ?? []).map(normalizeWorkoutSection),
             mealsByDay: data.mealsByDay ?? [],
             recipes: data.recipes ?? [],
           });
@@ -69,6 +114,7 @@ function useProvideRemoteDB(): RemoteDBContextValue {
           void setDoc(docRef, { ...defaultDB, createdAt: serverTimestamp() });
           setDbState(defaultDB);
         }
+
         setLoading(false);
       },
       (err) => {
@@ -81,14 +127,19 @@ function useProvideRemoteDB(): RemoteDBContextValue {
     return () => unsub();
   }, [docRef]);
 
-  // setDb helper mirroring useState setter, and persisting to Firestore
   const setDb = useCallback(
     (next: DB | ((prev: DB) => DB)) => {
       setDbState((prev) => {
         const resolved = typeof next === "function" ? (next as (p: DB) => DB)(prev) : next;
+
         if (docRef) {
-          void setDoc(docRef, { ...resolved, updatedAt: serverTimestamp() }, { merge: true });
+          void setDoc(
+            docRef,
+            { ...resolved, updatedAt: serverTimestamp() },
+            { merge: true }
+          );
         }
+
         return resolved;
       });
     },
@@ -100,14 +151,18 @@ function useProvideRemoteDB(): RemoteDBContextValue {
       setDbState(defaultDB);
       return;
     }
+
     const snap = await getDoc(docRef);
+
     if (snap.exists()) {
       const data = snap.data() as Partial<DB>;
+
       setDbState({
         ...defaultDB,
         ...data,
         account: { ...defaultDB.account, ...(data.account ?? {}) },
-        workouts: data.workouts ?? [],
+        workouts: (data.workouts ?? []).map(normalizeWorkoutEntry),
+        workoutSections: (data.workoutSections ?? []).map(normalizeWorkoutSection),
         mealsByDay: data.mealsByDay ?? [],
         recipes: data.recipes ?? [],
       });

@@ -2,19 +2,19 @@ export type ISODate = string; // "YYYY-MM-DD"
 
 export type LoggedSet = {
   id: string;
-  weight: number; // lbs (or kg — your call)
+  weight: number; 
   reps: number;
 };
 
 export type WorkoutSubSection = {
   id: string;
-  name: string; // e.g. "Kickbacks"
+  name: string;
   sets: LoggedSet[];
 };
 
 export type WorkoutSection = {
   id: string;
-  name: string; // e.g. "Glutes"
+  name: string; 
   exercises: WorkoutSubSection[];
 };
 
@@ -27,9 +27,9 @@ export type DayWorkoutEntry = {
 
 export type Nutrients = {
   calories: number;
-  protein: number; // g
-  carbs: number;   // g
-  fat: number;     // g
+  protein: number; 
+  carbs: number;   
+  fat: number;     
 };
 
 export type Recipe = {
@@ -42,7 +42,7 @@ export type Recipe = {
 export type DayMealEntry = {
   id: string;
   date: ISODate;
-  recipeIds: string[]; // planned/logged recipes for that day
+  recipeIds: string[];
 };
 
 export type Account = {
