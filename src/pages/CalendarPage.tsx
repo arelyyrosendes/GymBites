@@ -1,23 +1,14 @@
 import { useMemo, useState, type JSX } from "react";
 import { useRemoteDB } from "../hooks/useRemoteDB";
-import { todayISO } from "../utils";
-import type { DayWorkoutEntry, LoggedSet, Recipe, WorkoutSection } from "../types";
-
-function cloneSection(section: WorkoutSection): WorkoutSection {
-  return {
-    id: `section-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: section.name,
-    exercises: (section.exercises ?? []).map((exercise) => ({
-      id: `exercise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name: exercise.name,
-      sets: (exercise.sets ?? []).map((setItem) => ({
-        id: `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        weight: typeof setItem.weight === "number" ? setItem.weight : 0,
-        reps: typeof setItem.reps === "number" ? setItem.reps : 0,
-      })),
-    })),
-  };
-}
+import { todayISO, uid } from "../utils";
+import type {
+  DailyExercise,
+  DailyWorkoutSection,
+  DayWorkoutEntry,
+  GeneralWorkout,
+  LoggedSet,
+  Recipe,
+} from "../types";
 
 function parseISODate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
@@ -85,13 +76,28 @@ function formatRangeLabel(start: Date, end: Date): string {
   })}`;
 }
 
+function cloneGeneralWorkoutToDaily(template: GeneralWorkout): DailyWorkoutSection {
+  return {
+    id: uid("dailySection"),
+    templateId: template.id,
+    name: template.name,
+    exercises: (template.exercises ?? []).map((exercise) => ({
+      id: uid("dailyExercise"),
+      name: exercise.name,
+      sets: [],
+    })),
+  };
+}
+
 export default function CalendarPage(): JSX.Element {
   const { db, setDb, loading } = useRemoteDB();
   const [date, setDate] = useState(todayISO());
 
   const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
+  const [workoutModalStep, setWorkoutModalStep] = useState<"select" | "edit">("select");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [draftSection, setDraftSection] = useState<WorkoutSection | null>(null);
+  const [draftSection, setDraftSection] = useState<DailyWorkoutSection | null>(null);
+  const [newExerciseName, setNewExerciseName] = useState("");
 
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
 
@@ -132,7 +138,7 @@ export default function CalendarPage(): JSX.Element {
     return sum;
   }, [dayMeals]);
 
-  const workoutTemplates = useMemo(() => db.workoutSections ?? [], [db.workoutSections]);
+  const generalWorkouts = useMemo(() => db.generalWorkouts ?? [], [db.generalWorkouts]);
   const recipes = useMemo(() => db.recipes ?? [], [db.recipes]);
 
   const selectedLabel = useMemo(
@@ -147,26 +153,88 @@ export default function CalendarPage(): JSX.Element {
 
   function openWorkoutModal(): void {
     setIsWorkoutModalOpen(true);
+    setWorkoutModalStep("select");
     setSelectedTemplateId("");
     setDraftSection(null);
+    setNewExerciseName("");
   }
 
   function closeWorkoutModal(): void {
     setIsWorkoutModalOpen(false);
+    setWorkoutModalStep("select");
     setSelectedTemplateId("");
     setDraftSection(null);
+    setNewExerciseName("");
   }
 
-  function handleTemplateChange(templateId: string): void {
+  function chooseGeneralWorkout(templateId: string): void {
+    const template = generalWorkouts.find((item) => item.id === templateId);
+    if (!template) return;
+
     setSelectedTemplateId(templateId);
+    setDraftSection(cloneGeneralWorkoutToDaily(template));
+    setWorkoutModalStep("edit");
+  }
 
-    const template = workoutTemplates.find((section) => section.id === templateId);
-    if (!template) {
-      setDraftSection(null);
-      return;
-    }
+  function addExerciseToDraft(): void {
+    const clean = newExerciseName.trim();
+    if (!clean) return;
 
-    setDraftSection(cloneSection(template));
+    setDraftSection((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        exercises: [...(prev.exercises ?? []), { id: uid("dailyExercise"), name: clean, sets: [] }],
+      };
+    });
+
+    setNewExerciseName("");
+  }
+
+  function removeExerciseFromDraft(exerciseId: string): void {
+    setDraftSection((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        exercises: (prev.exercises ?? []).filter((exercise) => exercise.id !== exerciseId),
+      };
+    });
+  }
+
+  function addSetToDraftExercise(exerciseId: string): void {
+    setDraftSection((prev) => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        exercises: (prev.exercises ?? []).map((exercise) =>
+          exercise.id === exerciseId
+            ? {
+                ...exercise,
+                sets: [...(exercise.sets ?? []), { id: uid("set"), weight: 0, reps: 0 }],
+              }
+            : exercise
+        ),
+      };
+    });
+  }
+
+  function removeSetFromDraftExercise(exerciseId: string, setId: string): void {
+    setDraftSection((prev) => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        exercises: (prev.exercises ?? []).map((exercise) =>
+          exercise.id === exerciseId
+            ? {
+                ...exercise,
+                sets: (exercise.sets ?? []).filter((setItem) => setItem.id !== setId),
+              }
+            : exercise
+        ),
+      };
+    });
   }
 
   function updateDraftSet(
@@ -186,10 +254,7 @@ export default function CalendarPage(): JSX.Element {
                 ...exercise,
                 sets: (exercise.sets ?? []).map((setItem) =>
                   setItem.id === setId
-                    ? {
-                        ...setItem,
-                        [field]: Number.isNaN(value) ? 0 : value,
-                      }
+                    ? { ...setItem, [field]: Number.isNaN(value) ? 0 : value }
                     : setItem
                 ),
               }
@@ -214,14 +279,11 @@ export default function CalendarPage(): JSX.Element {
           sections: [...(existingDay.sections ?? []), draftSection],
         };
 
-        return {
-          ...prev,
-          workouts: updatedWorkouts,
-        };
+        return { ...prev, workouts: updatedWorkouts };
       }
 
       const newDayEntry: DayWorkoutEntry = {
-        id: `workout-day-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: uid("workoutDay"),
         date,
         sections: [draftSection],
         notes: "",
@@ -241,7 +303,6 @@ export default function CalendarPage(): JSX.Element {
       const updatedWorkouts = (prev.workouts ?? [])
         .map((entry) => {
           if (entry.date !== date) return entry;
-
           return {
             ...entry,
             sections: (entry.sections ?? []).filter((section) => section.id !== sectionId),
@@ -249,10 +310,7 @@ export default function CalendarPage(): JSX.Element {
         })
         .filter((entry) => (entry.sections ?? []).length > 0);
 
-      return {
-        ...prev,
-        workouts: updatedWorkouts,
-      };
+      return { ...prev, workouts: updatedWorkouts };
     });
   }
 
@@ -280,10 +338,7 @@ export default function CalendarPage(): JSX.Element {
             : [...(existingEntry.recipeIds ?? []), recipeId],
         };
 
-        return {
-          ...prev,
-          mealsByDay: updatedMeals,
-        };
+        return { ...prev, mealsByDay: updatedMeals };
       }
 
       return {
@@ -291,7 +346,7 @@ export default function CalendarPage(): JSX.Element {
         mealsByDay: [
           ...(prev.mealsByDay ?? []),
           {
-            id: `meal-day-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: uid("mealDay"),
             date,
             recipeIds: [recipeId],
           },
@@ -307,7 +362,6 @@ export default function CalendarPage(): JSX.Element {
       const updatedMeals = (prev.mealsByDay ?? [])
         .map((entry) => {
           if (entry.date !== date) return entry;
-
           return {
             ...entry,
             recipeIds: (entry.recipeIds ?? []).filter((id) => id !== recipeId),
@@ -315,10 +369,7 @@ export default function CalendarPage(): JSX.Element {
         })
         .filter((entry) => (entry.recipeIds ?? []).length > 0);
 
-      return {
-        ...prev,
-        mealsByDay: updatedMeals,
-      };
+      return { ...prev, mealsByDay: updatedMeals };
     });
   }
 
@@ -463,10 +514,11 @@ export default function CalendarPage(): JSX.Element {
                     <h3>{section.name}</h3>
                     <button
                       type="button"
-                      className="ghostDangerButton"
+                      className="ghostDangerButton iconOnly"
                       onClick={() => removeSectionFromDay(section.id)}
+                      aria-label="Remove section"
                     >
-                      Remove
+                      –
                     </button>
                   </div>
 
@@ -475,15 +527,21 @@ export default function CalendarPage(): JSX.Element {
                       <div key={exercise.id} className="exerciseBlock">
                         <strong>{exercise.name}</strong>
 
-                        <div className="setList">
-                          {(exercise.sets ?? []).map((setItem, index) => (
-                            <div key={setItem.id} className="setRow">
-                              <span className="muted">
-                                Set {index + 1}: {setItem.weight} lb × {setItem.reps} reps
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                        {(exercise.sets ?? []).length === 0 ? (
+                          <div className="muted small" style={{ marginTop: 6 }}>
+                            No sets added yet
+                          </div>
+                        ) : (
+                          <div className="setList">
+                            {(exercise.sets ?? []).map((setItem, index) => (
+                              <div key={setItem.id} className="setRow">
+                                <span className="muted">
+                                  Set {index + 1}: {setItem.weight} lb × {setItem.reps} reps
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -556,127 +614,205 @@ export default function CalendarPage(): JSX.Element {
       </section>
 
       <p className="muted small">
-        Tip: Add workouts in <b>Workouts</b> tab and recipes/meals in <b>Meals</b>.
+        Tip: Build workout templates in <b>Workouts</b> and add recipes/meals in <b>Meals</b>.
       </p>
 
       {isWorkoutModalOpen ? (
         <div className="modalOverlay" onClick={closeWorkoutModal}>
           <div className="modalCard" onClick={(e) => e.stopPropagation()}>
-            <div className="cardHeaderRow">
-              <div>
-                <h2>Add Workout</h2>
-                <p className="muted">
-                  Choose one of your saved workout sections and adjust each set before saving.
-                </p>
-              </div>
+            {workoutModalStep === "select" ? (
+              <>
+                <div className="cardHeaderRow">
+                  <div>
+                    <h2>Add Workout</h2>
+                    <p className="muted">Choose one of your saved workout templates.</p>
+                  </div>
 
-              <button type="button" className="ghostButton" onClick={closeWorkoutModal}>
-                Close
-              </button>
-            </div>
-
-            <div className="formGroup">
-              <label htmlFor="workout-template-select" className="label">
-                Saved Workout Section
-              </label>
-              <select
-                id="workout-template-select"
-                className="input"
-                value={selectedTemplateId}
-                onChange={(e) => handleTemplateChange(e.target.value)}
-              >
-                <option value="">Select a section</option>
-                {workoutTemplates.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedTemplateId && !draftSection ? (
-              <div className="emptyState">
-                <p>That section could not be loaded.</p>
-              </div>
-            ) : null}
-
-            {draftSection ? (
-              <div className="stack">
-                <div className="sectionPreviewHeader">
-                  <h3>{draftSection.name}</h3>
-                  <p className="muted">Edit each set before adding it to this day.</p>
+                  <button type="button" className="ghostButton" onClick={closeWorkoutModal}>
+                    Close
+                  </button>
                 </div>
 
-                {(draftSection.exercises ?? []).map((exercise) => (
-                  <div key={exercise.id} className="exerciseEditorCard">
-                    <div className="exerciseTitle">
-                      <strong>{exercise.name}</strong>
-                    </div>
-
-                    {(exercise.sets ?? []).map((setItem, index) => (
-                      <div key={setItem.id} className="setEditorRow">
-                        <div className="setLabel">
-                          <span className="muted">Set {index + 1}</span>
+                {generalWorkouts.length === 0 ? (
+                  <div className="emptyState">
+                    <p>No workout templates yet. Add them in the Workouts tab first.</p>
+                  </div>
+                ) : (
+                  <div className="stack">
+                    {generalWorkouts.map((workout) => (
+                      <button
+                        key={workout.id}
+                        type="button"
+                        className="selectRow"
+                        onClick={() => chooseGeneralWorkout(workout.id)}
+                      >
+                        <div className="itemTitle">{workout.name}</div>
+                        <div className="muted small">
+                          {(workout.exercises ?? []).length} exercise
+                          {(workout.exercises ?? []).length === 1 ? "" : "s"}
                         </div>
-
-                        <div className="setEditorGrid">
-                          <div className="formGroup">
-                            <label className="label" htmlFor={`${exercise.id}-${setItem.id}-weight`}>
-                              Weight
-                            </label>
-                            <input
-                              id={`${exercise.id}-${setItem.id}-weight`}
-                              type="number"
-                              min={0}
-                              className="input"
-                              value={setItem.weight}
-                              onChange={(e) =>
-                                updateDraftSet(
-                                  exercise.id,
-                                  setItem.id,
-                                  "weight",
-                                  parseInt(e.target.value || "0", 10)
-                                )
-                              }
-                            />
-                          </div>
-
-                          <div className="formGroup">
-                            <label className="label" htmlFor={`${exercise.id}-${setItem.id}-reps`}>
-                              Reps
-                            </label>
-                            <input
-                              id={`${exercise.id}-${setItem.id}-reps`}
-                              type="number"
-                              min={0}
-                              className="input"
-                              value={setItem.reps}
-                              onChange={(e) =>
-                                updateDraftSet(
-                                  exercise.id,
-                                  setItem.id,
-                                  "reps",
-                                  parseInt(e.target.value || "0", 10)
-                                )
-                              }
-                            />
-                          </div>
-                        </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
-                ))}
+                )}
+              </>
+            ) : (
+              <>
+                <div className="cardHeaderRow">
+                  <div>
+                    <h2>Edit Workout</h2>
+                    <p className="muted">
+                      Customize this daily copy without changing your main template.
+                    </p>
+                  </div>
 
-                <div className="modalActions">
-                  <button type="button" className="ghostButton" onClick={closeWorkoutModal}>
-                    Cancel
-                  </button>
-                  <button type="button" className="primaryButton" onClick={saveDraftSectionToDay}>
-                    Save Workout
-                  </button>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      className="ghostButton"
+                      onClick={() => setWorkoutModalStep("select")}
+                    >
+                      Back
+                    </button>
+                    <button type="button" className="ghostButton" onClick={closeWorkoutModal}>
+                      Close
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ) : null}
+
+                {draftSection ? (
+                  <div className="stack">
+                    <div className="sectionPreviewHeader">
+                      <h3>{draftSection.name}</h3>
+                      <p className="muted">Add/remove exercises and log sets for today.</p>
+                    </div>
+
+                    <div className="row">
+                      <input
+                        className="input"
+                        placeholder="Add another exercise for today"
+                        value={newExerciseName}
+                        onChange={(e) => setNewExerciseName(e.target.value)}
+                      />
+                      <button type="button" className="btn" onClick={addExerciseToDraft}>
+                        Add Exercise
+                      </button>
+                    </div>
+
+                    {(draftSection.exercises ?? []).map((exercise: DailyExercise) => (
+                      <div key={exercise.id} className="exerciseEditorCard">
+                        <div className="entryHeaderRow">
+                          <div className="exerciseTitle">
+                            <strong>{exercise.name}</strong>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="ghostDangerButton"
+                            onClick={() => removeExerciseFromDraft(exercise.id)}
+                          >
+                            -
+                          </button>
+                        </div>
+
+                        {(exercise.sets ?? []).length === 0 ? (
+                          <p className="muted small">No sets yet for this exercise.</p>
+                        ) : null}
+
+                        {(exercise.sets ?? []).map((setItem, index) => (
+                          <div key={setItem.id} className="setEditorRow">
+                            <div className="entryHeaderRow">
+                              <div className="setLabel">
+                                <span className="muted">Set {index + 1}</span>
+                              </div>
+
+                              <button
+                                type="button"
+                                className="ghostDangerButton"
+                                onClick={() => removeSetFromDraftExercise(exercise.id, setItem.id)}
+                              >
+                                -
+                              </button>
+                            </div>
+
+                            <div className="setEditorGrid">
+                              <div className="formGroup">
+                                <label
+                                  className="label"
+                                  htmlFor={`${exercise.id}-${setItem.id}-weight`}
+                                >
+                                  Weight
+                                </label>
+                                <input
+                                  id={`${exercise.id}-${setItem.id}-weight`}
+                                  type="number"
+                                  min={0}
+                                  className="input"
+                                  value={setItem.weight}
+                                  onChange={(e) =>
+                                    updateDraftSet(
+                                      exercise.id,
+                                      setItem.id,
+                                      "weight",
+                                      parseInt(e.target.value || "0", 10)
+                                    )
+                                  }
+                                />
+                              </div>
+
+                              <div className="formGroup">
+                                <label
+                                  className="label"
+                                  htmlFor={`${exercise.id}-${setItem.id}-reps`}
+                                >
+                                  Reps
+                                </label>
+                                <input
+                                  id={`${exercise.id}-${setItem.id}-reps`}
+                                  type="number"
+                                  min={0}
+                                  className="input"
+                                  value={setItem.reps}
+                                  onChange={(e) =>
+                                    updateDraftSet(
+                                      exercise.id,
+                                      setItem.id,
+                                      "reps",
+                                      parseInt(e.target.value || "0", 10)
+                                    )
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        <button
+                          type="button"
+                          className="ghostButton"
+                          onClick={() => addSetToDraftExercise(exercise.id)}
+                        >
+                          + Add Set
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="modalActions">
+                      <button
+                        type="button"
+                        className="ghostButton"
+                        onClick={() => setWorkoutModalStep("select")}
+                      >
+                        Back
+                      </button>
+                      <button type="button" className="primaryButton" onClick={saveDraftSectionToDay}>
+                        Save Workout
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
       ) : null}

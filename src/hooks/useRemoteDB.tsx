@@ -21,21 +21,22 @@ import type {
   Account,
   DayMealEntry,
   DayWorkoutEntry,
+  DailyWorkoutSection,
+  GeneralWorkout,
   Recipe,
-  WorkoutSection,
 } from "../types";
 
 type DB = {
+  generalWorkouts: GeneralWorkout[];
   workouts: DayWorkoutEntry[];
-  workoutSections: WorkoutSection[];
   mealsByDay: DayMealEntry[];
   recipes: Recipe[];
   account: Account;
 };
 
 const defaultDB: DB = {
+  generalWorkouts: [],
   workouts: [],
-  workoutSections: [],
   mealsByDay: [],
   recipes: [],
   account: { displayName: "User" },
@@ -50,9 +51,21 @@ type RemoteDBContextValue = {
 
 const RemoteDBContext = createContext<RemoteDBContextValue | undefined>(undefined);
 
-function normalizeWorkoutSection(section: Partial<WorkoutSection>): WorkoutSection {
+function normalizeGeneralWorkout(section: Partial<GeneralWorkout>): GeneralWorkout {
+  return {
+    id: section.id ?? `general-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: section.name ?? "Untitled Workout",
+    exercises: (section.exercises ?? []).map((exercise) => ({
+      id: exercise.id ?? `exercise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: exercise.name ?? "Unnamed Exercise",
+    })),
+  };
+}
+
+function normalizeDailySection(section: Partial<DailyWorkoutSection>): DailyWorkoutSection {
   return {
     id: section.id ?? `section-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    templateId: section.templateId,
     name: section.name ?? "Untitled Section",
     exercises: (section.exercises ?? []).map((exercise) => ({
       id: exercise.id ?? `exercise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -71,7 +84,7 @@ function normalizeWorkoutEntry(entry: Partial<DayWorkoutEntry>): DayWorkoutEntry
     id: entry.id ?? `workout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     date: entry.date ?? "",
     notes: entry.notes ?? "",
-    sections: (entry.sections ?? []).map(normalizeWorkoutSection),
+    sections: (entry.sections ?? []).map(normalizeDailySection),
   };
 }
 
@@ -105,8 +118,8 @@ function useProvideRemoteDB(): RemoteDBContextValue {
             ...defaultDB,
             ...data,
             account: { ...defaultDB.account, ...(data.account ?? {}) },
+            generalWorkouts: (data.generalWorkouts ?? []).map(normalizeGeneralWorkout),
             workouts: (data.workouts ?? []).map(normalizeWorkoutEntry),
-            workoutSections: (data.workoutSections ?? []).map(normalizeWorkoutSection),
             mealsByDay: data.mealsByDay ?? [],
             recipes: data.recipes ?? [],
           });
@@ -161,8 +174,8 @@ function useProvideRemoteDB(): RemoteDBContextValue {
         ...defaultDB,
         ...data,
         account: { ...defaultDB.account, ...(data.account ?? {}) },
+        generalWorkouts: (data.generalWorkouts ?? []).map(normalizeGeneralWorkout),
         workouts: (data.workouts ?? []).map(normalizeWorkoutEntry),
-        workoutSections: (data.workoutSections ?? []).map(normalizeWorkoutSection),
         mealsByDay: data.mealsByDay ?? [],
         recipes: data.recipes ?? [],
       });

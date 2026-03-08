@@ -1,98 +1,63 @@
-import { useMemo, useState, type JSX } from "react";
+import { useState, type JSX } from "react";
 import { useRemoteDB } from "../hooks/useRemoteDB";
-import { uid, todayISO, clampNumber } from "../utils";
-import type { DayWorkoutEntry, WorkoutSection, WorkoutSubSection } from "../types";
+import { uid } from "../utils";
+import type { GeneralExercise, GeneralWorkout } from "../types";
 
 export default function WorkoutLogPage(): JSX.Element {
   const { db, setDb, loading } = useRemoteDB();
-  const [date, setDate] = useState(todayISO());
-
-  const entry = useMemo(() => {
-    return db.workouts.find((w) => w.date === date) ?? null;
-  }, [db.workouts, date]);
-
-  const ensureEntry = (): DayWorkoutEntry => {
-    const existing = db.workouts.find((w) => w.date === date);
-    if (existing) return existing;
-
-    const created: DayWorkoutEntry = { id: uid("workoutDay"), date, sections: [] };
-    setDb((prev) => ({ ...prev, workouts: [created, ...prev.workouts] }));
-    return created;
-  };
 
   const addSection = (name: string) => {
     const clean = name.trim();
     if (!clean) return;
-    const day = ensureEntry();
-    const section: WorkoutSection = { id: uid("section"), name: clean, exercises: [] };
+
+    const section: GeneralWorkout = {
+      id: uid("generalWorkout"),
+      name: clean,
+      exercises: [],
+    };
 
     setDb((prev) => ({
       ...prev,
-      workouts: prev.workouts.map((w) =>
-        w.id === day.id ? { ...w, sections: [...w.sections, section] } : w
-      ),
+      generalWorkouts: [section, ...(prev.generalWorkouts ?? [])],
     }));
   };
 
   const addExercise = (sectionId: string, name: string) => {
     const clean = name.trim();
     if (!clean) return;
-    const day = ensureEntry();
-    const ex: WorkoutSubSection = { id: uid("exercise"), name: clean, sets: [] };
+
+    const exercise: GeneralExercise = {
+      id: uid("generalExercise"),
+      name: clean,
+    };
 
     setDb((prev) => ({
       ...prev,
-      workouts: prev.workouts.map((w) => {
-        if (w.id !== day.id) return w;
-        return {
-          ...w,
-          sections: w.sections.map((s) =>
-            s.id === sectionId ? { ...s, exercises: [...s.exercises, ex] } : s
-          ),
-        };
-      }),
-    }));
-  };
-
-  const addSet = (sectionId: string, exerciseId: string, weight: number, reps: number) => {
-    const day = ensureEntry();
-    setDb((prev) => ({
-      ...prev,
-      workouts: prev.workouts.map((w) => {
-        if (w.id !== day.id) return w;
-        return {
-          ...w,
-          sections: w.sections.map((s) => {
-            if (s.id !== sectionId) return s;
-            return {
-              ...s,
-              exercises: s.exercises.map((ex) => {
-                if (ex.id !== exerciseId) return ex;
-                return {
-                  ...ex,
-                  sets: [
-                    ...ex.sets,
-                    {
-                      id: uid("set"),
-                      weight: clampNumber(weight, 0, 2000),
-                      reps: clampNumber(reps, 0, 500),
-                    },
-                  ],
-                };
-              }),
-            };
-          }),
-        };
-      }),
+      generalWorkouts: (prev.generalWorkouts ?? []).map((section) =>
+        section.id === sectionId
+          ? { ...section, exercises: [...(section.exercises ?? []), exercise] }
+          : section
+      ),
     }));
   };
 
   const removeSection = (sectionId: string) => {
-    if (!entry) return;
     setDb((prev) => ({
       ...prev,
-      workouts: prev.workouts.map((w) =>
-        w.id === entry.id ? { ...w, sections: w.sections.filter((s) => s.id !== sectionId) } : w
+      generalWorkouts: (prev.generalWorkouts ?? []).filter((section) => section.id !== sectionId),
+    }));
+  };
+
+  const removeExercise = (sectionId: string, exerciseId: string) => {
+    setDb((prev) => ({
+      ...prev,
+      generalWorkouts: (prev.generalWorkouts ?? []).map((section) =>
+        section.id === sectionId
+          ? {
+              ...section,
+              exercises: (section.exercises ?? []).filter((exercise) => exercise.id !== exerciseId),
+            }
+          : section
       ),
     }));
   };
@@ -108,37 +73,35 @@ export default function WorkoutLogPage(): JSX.Element {
   return (
     <div className="page">
       <header className="pageHeader">
-        <h1>Workout Log</h1>
-        <p className="muted">Add a section (e.g., Glutes) → add exercise (e.g., Kickbacks) → log sets</p>
+        <h1>Workouts</h1>
+        <p className="muted">
+          Create your reusable workout templates here. Add sets and weight later on the dashboard.
+        </p>
       </header>
 
-      <section className="card">
-        <label className="label">Workout date</label>
-        <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </section>
-
       <AddRow
-        placeholder="New section (e.g., Glutes)"
+        placeholder="New workout section (e.g., Glutes, Legs, Push Day)"
         button="Add Section"
         onAdd={addSection}
       />
 
       <section className="stack">
-        {(entry?.sections ?? []).length === 0 ? (
+        {(db.generalWorkouts ?? []).length === 0 ? (
           <div className="card">
-            <p className="muted">No sections yet. Add one above.</p>
+            <p className="muted">No workout templates yet. Add one above.</p>
           </div>
         ) : (
-          (entry?.sections ?? []).map((s) => (
-            <div key={s.id} className="card">
+          (db.generalWorkouts ?? []).map((section) => (
+            <div key={section.id} className="card">
               <div className="rowBetween">
                 <div>
-                  <h2 style={{ margin: 0 }}>{s.name}</h2>
+                  <h2 style={{ margin: 0 }}>{section.name}</h2>
                   <p className="muted small" style={{ marginTop: 4 }}>
-                    {s.exercises.length} exercise(s)
+                    {(section.exercises ?? []).length} exercise(s)
                   </p>
                 </div>
-                <button className="btnGhost" onClick={() => removeSection(s.id)}>
+
+                <button className="btnGhost" onClick={() => removeSection(section.id)}>
                   Remove
                 </button>
               </div>
@@ -146,23 +109,33 @@ export default function WorkoutLogPage(): JSX.Element {
               <div className="divider" />
 
               <AddRow
-                placeholder={`Add exercise under ${s.name} (e.g., Kickbacks)`}
+                placeholder={`Add exercise under ${section.name} (e.g., Kickbacks)`}
                 button="Add Exercise"
-                onAdd={(name) => addExercise(s.id, name)}
+                onAdd={(name) => addExercise(section.id, name)}
               />
 
-              <div className="stack">
-                {s.exercises.map((ex) => (
-                  <ExerciseCard
-                    key={ex.id}
-                    sectionId={s.id}
-                    exerciseId={ex.id}
-                    name={ex.name}
-                    sets={ex.sets.map((st) => ({ id: st.id, weight: st.weight, reps: st.reps }))}
-                    onAddSet={(w, r) => addSet(s.id, ex.id, w, r)}
-                  />
-                ))}
-              </div>
+              {(section.exercises ?? []).length === 0 ? (
+                <p className="muted small">No exercises yet.</p>
+              ) : (
+                <div className="stack">
+                  {(section.exercises ?? []).map((exercise) => (
+                    <div key={exercise.id} className="subCard">
+                      <div className="rowBetween">
+                        <div>
+                          <div className="itemTitle">{exercise.name}</div>
+                        </div>
+
+                        <button
+                          className="btnGhost"
+                          onClick={() => removeExercise(section.id, exercise.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         )}
@@ -177,6 +150,7 @@ function AddRow(props: {
   onAdd: (value: string) => void;
 }): JSX.Element {
   const [value, setValue] = useState("");
+
   return (
     <section className="card">
       <div className="row">
@@ -197,69 +171,5 @@ function AddRow(props: {
         </button>
       </div>
     </section>
-  );
-}
-
-function ExerciseCard(props: {
-  sectionId: string;
-  exerciseId: string;
-  name: string;
-  sets: { id: string; weight: number; reps: number }[];
-  onAddSet: (weight: number, reps: number) => void;
-}): JSX.Element {
-  const [weight, setWeight] = useState<number>(0);
-  const [reps, setReps] = useState<number>(0);
-
-  return (
-    <div className="subCard">
-      <div className="rowBetween">
-        <div>
-          <div className="itemTitle">{props.name}</div>
-          <div className="muted small">{props.sets.length} set(s)</div>
-        </div>
-      </div>
-
-      <div className="row">
-        <div className="field">
-          <label className="label">Weight</label>
-          <input
-            className="input"
-            type="number"
-            value={weight}
-            onChange={(e) => setWeight(Number(e.target.value))}
-            min={0}
-          />
-        </div>
-        <div className="field">
-          <label className="label">Reps</label>
-          <input
-            className="input"
-            type="number"
-            value={reps}
-            onChange={(e) => setReps(Number(e.target.value))}
-            min={0}
-          />
-        </div>
-        <button className="btn" onClick={() => props.onAddSet(weight, reps)}>
-          Add Set
-        </button>
-      </div>
-
-      {props.sets.length > 0 && (
-        <>
-          <div className="divider" />
-          <div className="stack">
-            {props.sets.map((s, idx) => (
-              <div className="itemRow" key={s.id}>
-                <div className="muted small">Set {idx + 1}</div>
-                <div className="small">
-                  {s.weight} × {s.reps}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
   );
 }

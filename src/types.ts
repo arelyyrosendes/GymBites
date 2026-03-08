@@ -1,35 +1,47 @@
 export type ISODate = string; // "YYYY-MM-DD"
 
+export type GeneralExercise = {
+  id: string;
+  name: string;
+};
+
+export type GeneralWorkout = {
+  id: string;
+  name: string; // e.g. "Glutes"
+  exercises: GeneralExercise[];
+};
+
 export type LoggedSet = {
   id: string;
-  weight: number; 
+  weight: number;
   reps: number;
 };
 
-export type WorkoutSubSection = {
+export type DailyExercise = {
   id: string;
   name: string;
   sets: LoggedSet[];
 };
 
-export type WorkoutSection = {
+export type DailyWorkoutSection = {
   id: string;
-  name: string; 
-  exercises: WorkoutSubSection[];
+  templateId?: string;
+  name: string;
+  exercises: DailyExercise[];
 };
 
 export type DayWorkoutEntry = {
   id: string;
   date: ISODate;
-  sections: WorkoutSection[];
+  sections: DailyWorkoutSection[];
   notes?: string;
 };
 
 export type Nutrients = {
   calories: number;
-  protein: number; 
-  carbs: number;   
-  fat: number;     
+  protein: number;
+  carbs: number;
+  fat: number;
 };
 
 export type Recipe = {

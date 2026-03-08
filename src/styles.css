@@ -235,13 +235,29 @@ textarea.input:focus {
 
 .btnDanger,
 .ghostDangerButton {
+  min-width: 40px;
+  min-height: 36px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 123, 123, 0.32);
   background: linear-gradient(180deg, rgba(255, 123, 123, 0.2), var(--danger-soft));
   color: #ffdede;
   cursor: pointer;
   transition: border-color 0.18s ease, background 0.18s ease, transform 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.iconOnly {
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
 }
 
 .btnDanger:hover,
@@ -339,6 +355,12 @@ textarea.input:focus {
   margin-bottom: 8px;
 }
 
+.exerciseBlock h3,
+.exerciseBlock strong {
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
 .exerciseEditorGrid,
 .setEditorGrid {
   display: grid;
@@ -356,6 +378,19 @@ textarea.input:focus {
 
 .setLabel {
   margin-bottom: 10px;
+}
+
+/* Keep stacked Remove buttons from crowding in the workout editor */
+.exerciseEditorCard .entryHeaderRow,
+.setEditorRow .entryHeaderRow {
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.exerciseEditorCard .entryHeaderRow button,
+.setEditorRow .entryHeaderRow button {
+  margin-left: auto;
 }
 
 .emptyState {
