@@ -1,8 +1,10 @@
 import { useState, type JSX } from "react";
 import { useLocalDB } from "../hooks/useLocalDB";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function AccountPage(): JSX.Element {
   const { db, setDb } = useLocalDB();
+  const { user, signOutUser } = useAuth();
   const [displayName, setDisplayName] = useState(db.account.displayName ?? "");
   const [goal, setGoal] = useState(db.account.goal ?? "");
 
@@ -20,15 +22,21 @@ export default function AccountPage(): JSX.Element {
   const resetAll = () => {
     const ok = confirm("Reset all GymBites data? This cannot be undone.");
     if (!ok) return;
-    localStorage.removeItem("gymbites_db_v1");
-    window.location.reload();
+    setDb((prev) => ({ ...prev, workouts: [], mealsByDay: [], recipes: [] }));
   };
 
   return (
     <div className="page">
       <header className="pageHeader">
-        <h1>Account</h1>
-        <p className="muted">Settings + profile (local-only for now)</p>
+        <div>
+          <h1>Account</h1>
+          <p className="muted">
+            Signed in as {user?.email ?? "unknown"} • Settings + profile (local-only for now)
+          </p>
+        </div>
+        <button className="btnGhost" onClick={() => void signOutUser()}>
+          Log out
+        </button>
       </header>
 
       <section className="card stack">
