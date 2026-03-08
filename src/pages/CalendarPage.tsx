@@ -6,6 +6,7 @@ import type {
   DailyWorkoutSection,
   DayWorkoutEntry,
   GeneralWorkout,
+  MealLabel,
   LoggedSet,
   Recipe,
 } from "../types";
@@ -89,17 +90,26 @@ function cloneGeneralWorkoutToDaily(template: GeneralWorkout): DailyWorkoutSecti
   };
 }
 
+const MEAL_LABELS: MealLabel[] = ["Breakfast", "Lunch", "Dinner", "Snack", "Other"];
+
+type DayMealDisplayItem = {
+  itemId: string;
+  recipe: Recipe;
+  label: MealLabel | undefined;
+};
+
 export default function CalendarPage(): JSX.Element {
   const { db, setDb, loading } = useRemoteDB();
   const [date, setDate] = useState(todayISO());
 
   const [isWorkoutModalOpen, setIsWorkoutModalOpen] = useState(false);
   const [workoutModalStep, setWorkoutModalStep] = useState<"select" | "edit">("select");
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [, setSelectedTemplateId] = useState("");
   const [draftSection, setDraftSection] = useState<DailyWorkoutSection | null>(null);
   const [newExerciseName, setNewExerciseName] = useState("");
 
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
+  const [mealLabel, setMealLabel] = useState<MealLabel>("Lunch");
 
   const selectedDateObj = useMemo(() => parseISODate(date), [date]);
 
@@ -120,20 +130,32 @@ export default function CalendarPage(): JSX.Element {
     [db.mealsByDay, date]
   );
 
-  const dayMeals = useMemo(() => {
+  const dayMeals = useMemo((): DayMealDisplayItem[] => {
     const recipesById = new Map<string, Recipe>((db.recipes ?? []).map((r) => [r.id, r]));
-    return (dayMealsEntry?.recipeIds ?? [])
-      .map((id) => recipesById.get(id))
-      .filter((recipe): recipe is Recipe => Boolean(recipe));
+    const items = dayMealsEntry?.items ?? [];
+    const results: DayMealDisplayItem[] = [];
+
+    for (const item of items) {
+      const recipe = recipesById.get(item.recipeId);
+      if (!recipe) continue;
+
+      results.push({
+        itemId: item.id,
+        recipe,
+        label: item.label as MealLabel | undefined,
+      });
+    }
+
+    return results;
   }, [dayMealsEntry, db.recipes]);
 
   const totals = useMemo(() => {
     const sum = { calories: 0, protein: 0, carbs: 0, fat: 0 };
-    for (const r of dayMeals) {
-      sum.calories += r.nutrients.calories;
-      sum.protein += r.nutrients.protein;
-      sum.carbs += r.nutrients.carbs;
-      sum.fat += r.nutrients.fat;
+    for (const mealEntry of dayMeals) {
+      sum.calories += mealEntry.recipe.nutrients.calories;
+      sum.protein += mealEntry.recipe.nutrients.protein;
+      sum.carbs += mealEntry.recipe.nutrients.carbs;
+      sum.fat += mealEntry.recipe.nutrients.fat;
     }
     return sum;
   }, [dayMeals]);
@@ -329,13 +351,13 @@ export default function CalendarPage(): JSX.Element {
       if (existingMealIndex >= 0) {
         const updatedMeals = [...prev.mealsByDay];
         const existingEntry = updatedMeals[existingMealIndex]!;
-        const alreadyIncluded = (existingEntry.recipeIds ?? []).includes(recipeId);
 
         updatedMeals[existingMealIndex] = {
           ...existingEntry,
-          recipeIds: alreadyIncluded
-            ? existingEntry.recipeIds
-            : [...(existingEntry.recipeIds ?? []), recipeId],
+          items: [
+            ...(existingEntry.items ?? []),
+            { id: uid("mealItem"), recipeId, label: mealLabel },
+          ],
         };
 
         return { ...prev, mealsByDay: updatedMeals };
@@ -348,7 +370,7 @@ export default function CalendarPage(): JSX.Element {
           {
             id: uid("mealDay"),
             date,
-            recipeIds: [recipeId],
+            items: [{ id: uid("mealItem"), recipeId, label: mealLabel }],
           },
         ],
       };
@@ -357,17 +379,17 @@ export default function CalendarPage(): JSX.Element {
     closeMealModal();
   }
 
-  function removeMealFromDay(recipeId: string): void {
+  function removeMealFromDay(itemId: string): void {
     setDb((prev) => {
       const updatedMeals = (prev.mealsByDay ?? [])
         .map((entry) => {
           if (entry.date !== date) return entry;
           return {
             ...entry,
-            recipeIds: (entry.recipeIds ?? []).filter((id) => id !== recipeId),
+            items: (entry.items ?? []).filter((item) => item.id !== itemId),
           };
         })
-        .filter((entry) => (entry.recipeIds ?? []).length > 0);
+        .filter((entry) => (entry.items ?? []).length > 0);
 
       return { ...prev, mealsByDay: updatedMeals };
     });
@@ -384,8 +406,7 @@ export default function CalendarPage(): JSX.Element {
   return (
     <div className="page">
       <header className="pageHeader">
-        <h1>GymBites</h1>
-        <p className="muted">Calendar: workouts + meals for the day</p>
+
       </header>
 
       {loading ? <p className="muted">Syncing your data…</p> : null}
@@ -441,7 +462,7 @@ export default function CalendarPage(): JSX.Element {
               (db.workouts ?? []).find((w) => w.date === iso)?.sections?.length ?? 0;
 
             const mealsEntry = (db.mealsByDay ?? []).find((m) => m.date === iso);
-            const mealsCount = mealsEntry?.recipeIds.length ?? 0;
+            const mealsCount = mealsEntry?.items?.length ?? 0;
 
             return (
               <button
@@ -574,23 +595,33 @@ export default function CalendarPage(): JSX.Element {
           ) : (
             <>
               <div className="stack">
-                {dayMeals.map((r) => (
-                  <div key={r.id} className="entryCard">
+                {dayMeals.map((mealEntry) => (
+                  <div key={mealEntry.itemId} className="entryCard">
                     <div className="entryHeaderRow">
                       <div>
-                        <div className="itemTitle">{r.name}</div>
+                        <div className="itemTitle">
+                          {mealEntry.recipe.name}
+                          {mealEntry.label ? (
+                            <span className="pill" style={{ marginLeft: 8 }}>
+                              {mealEntry.label}
+                            </span>
+                          ) : null}
+                        </div>
                         <div className="muted small">
-                          {r.nutrients.calories} cal • P {r.nutrients.protein} • C {r.nutrients.carbs} •
-                          {" "}F {r.nutrients.fat}
+                          {mealEntry.recipe.nutrients.calories} cal • P{" "}
+                          {mealEntry.recipe.nutrients.protein} • C{" "}
+                          {mealEntry.recipe.nutrients.carbs} • F{" "}
+                          {mealEntry.recipe.nutrients.fat}
                         </div>
                       </div>
 
                       <button
                         type="button"
                         className="ghostDangerButton"
-                        onClick={() => removeMealFromDay(r.id)}
+                        onClick={() => removeMealFromDay(mealEntry.itemId)}
+                        aria-label="Remove meal"
                       >
-                        Remove
+                        -
                       </button>
                     </div>
                   </div>
@@ -710,6 +741,7 @@ export default function CalendarPage(): JSX.Element {
                             type="button"
                             className="ghostDangerButton"
                             onClick={() => removeExerciseFromDraft(exercise.id)}
+                            aria-label="Remove exercise"
                           >
                             -
                           </button>
@@ -730,6 +762,7 @@ export default function CalendarPage(): JSX.Element {
                                 type="button"
                                 className="ghostDangerButton"
                                 onClick={() => removeSetFromDraftExercise(exercise.id, setItem.id)}
+                                aria-label="Remove set"
                               >
                                 -
                               </button>
@@ -805,7 +838,11 @@ export default function CalendarPage(): JSX.Element {
                       >
                         Back
                       </button>
-                      <button type="button" className="primaryButton" onClick={saveDraftSectionToDay}>
+                      <button
+                        type="button"
+                        className="primaryButton"
+                        onClick={saveDraftSectionToDay}
+                      >
                         Save Workout
                       </button>
                     </div>
@@ -836,22 +873,45 @@ export default function CalendarPage(): JSX.Element {
                 <p>No saved meals yet. Add meals in the Meals tab first.</p>
               </div>
             ) : (
-              <div className="stack">
-                {recipes.map((recipe) => (
-                  <button
-                    key={recipe.id}
-                    type="button"
-                    className="selectRow"
-                    onClick={() => addRecipeToDay(recipe.id)}
+              <>
+                <div className="stack">
+                  {recipes.map((recipe) => (
+                    <button
+                      key={recipe.id}
+                      type="button"
+                      className="selectRow"
+                      onClick={() => addRecipeToDay(recipe.id)}
+                    >
+                      <div className="itemTitle">{recipe.name}</div>
+                      <div className="muted small">
+                        {recipe.nutrients.calories} cal • P {recipe.nutrients.protein} • C{" "}
+                        {recipe.nutrients.carbs} • F {recipe.nutrients.fat}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="divider" />
+
+                <div className="stack">
+                  <div className="label">Label this meal</div>
+                  <div
+                    className="navBubbles"
+                    style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
                   >
-                    <div className="itemTitle">{recipe.name}</div>
-                    <div className="muted small">
-                      {recipe.nutrients.calories} cal • P {recipe.nutrients.protein} • C{" "}
-                      {recipe.nutrients.carbs} • F {recipe.nutrients.fat}
-                    </div>
-                  </button>
-                ))}
-              </div>
+                    {MEAL_LABELS.map((label) => (
+                      <button
+                        key={label}
+                        type="button"
+                        className={`pill ${mealLabel === label ? "selected" : ""}`}
+                        onClick={() => setMealLabel(label)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>

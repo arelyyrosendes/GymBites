@@ -67,11 +67,6 @@ export default function App(): JSX.Element {
     { label: "Profile", path: "/account" },
   ];
 
-  const mainAppPaths = ["/calendar", "/workouts", "/meals", "/account"];
-
-  const showBottomNav =
-    !!user && mainAppPaths.some((path) => location.pathname.startsWith(path));
-
   const activeIndex = Math.max(
     0,
     tabs.findIndex((tab) => location.pathname.startsWith(tab.path))
@@ -107,6 +102,17 @@ export default function App(): JSX.Element {
 
   return (
     <div className="appShell">
+      {user ? (
+        <div className="topNavShell">
+          <div className="brandGhost">GymBites</div>
+          <BottomNav
+            items={tabs}
+            activeIndex={activeIndex}
+            onChange={(idx) => navigate(tabs[idx]!.path)}
+            variant="top"
+          />
+        </div>
+      ) : null}
       <div className="appContent">
         <Routes>
           <Route
@@ -174,14 +180,6 @@ export default function App(): JSX.Element {
           />
         </Routes>
       </div>
-
-      {showBottomNav ? (
-        <BottomNav
-          items={tabs}
-          activeIndex={activeIndex}
-          onChange={(idx) => navigate(tabs[idx]!.path)}
-        />
-      ) : null}
     </div>
   );
 }

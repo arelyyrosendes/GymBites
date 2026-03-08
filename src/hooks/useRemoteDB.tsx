@@ -23,6 +23,8 @@ import type {
   DayWorkoutEntry,
   DailyWorkoutSection,
   GeneralWorkout,
+  MealLabel,
+  PlannedMeal,
   Recipe,
 } from "../types";
 
@@ -88,6 +90,32 @@ function normalizeWorkoutEntry(entry: Partial<DayWorkoutEntry>): DayWorkoutEntry
   };
 }
 
+function normalizePlannedMeal(item: Partial<PlannedMeal>): PlannedMeal {
+  return {
+    id: item.id ?? `meal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    recipeId: item.recipeId ?? "",
+    label: (item.label as MealLabel) ?? undefined,
+  };
+}
+
+function normalizeMeals(entry: Partial<DayMealEntry>): DayMealEntry {
+  // Backward compatibility: legacy recipeIds array
+  if (Array.isArray((entry as any).recipeIds)) {
+    const recipeIds: string[] = (entry as any).recipeIds;
+    return {
+      id: entry.id ?? `meals-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      date: entry.date ?? "",
+      items: recipeIds.map((rid) => normalizePlannedMeal({ recipeId: rid })),
+    };
+  }
+
+  return {
+    id: entry.id ?? `meals-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    date: entry.date ?? "",
+    items: (entry.items ?? []).map(normalizePlannedMeal),
+  };
+}
+
 function useProvideRemoteDB(): RemoteDBContextValue {
   const { user } = useAuth();
   const firestore = getFirestore();
@@ -120,7 +148,7 @@ function useProvideRemoteDB(): RemoteDBContextValue {
             account: { ...defaultDB.account, ...(data.account ?? {}) },
             generalWorkouts: (data.generalWorkouts ?? []).map(normalizeGeneralWorkout),
             workouts: (data.workouts ?? []).map(normalizeWorkoutEntry),
-            mealsByDay: data.mealsByDay ?? [],
+            mealsByDay: (data.mealsByDay ?? []).map(normalizeMeals),
             recipes: data.recipes ?? [],
           });
         } else {
@@ -176,7 +204,7 @@ function useProvideRemoteDB(): RemoteDBContextValue {
         account: { ...defaultDB.account, ...(data.account ?? {}) },
         generalWorkouts: (data.generalWorkouts ?? []).map(normalizeGeneralWorkout),
         workouts: (data.workouts ?? []).map(normalizeWorkoutEntry),
-        mealsByDay: data.mealsByDay ?? [],
+        mealsByDay: (data.mealsByDay ?? []).map(normalizeMeals),
         recipes: data.recipes ?? [],
       });
     }

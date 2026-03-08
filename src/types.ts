@@ -51,10 +51,18 @@ export type Recipe = {
   notes?: string;
 };
 
+export type MealLabel = "Breakfast" | "Lunch" | "Dinner" | "Snack" | "Other";
+
+export type PlannedMeal = {
+  id: string;
+  recipeId: string;
+  label?: MealLabel;
+};
+
 export type DayMealEntry = {
   id: string;
   date: ISODate;
-  recipeIds: string[];
+  items: PlannedMeal[];
 };
 
 export type Account = {

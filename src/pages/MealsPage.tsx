@@ -1,11 +1,10 @@
-import { useMemo, useState, type JSX } from "react";
+import { useState, type JSX } from "react";
 import { useRemoteDB } from "../hooks/useRemoteDB";
-import { uid, todayISO, clampNumber } from "../utils";
+import { uid, clampNumber } from "../utils";
 import type { Recipe } from "../types";
 
 export default function MealsPage(): JSX.Element {
   const { db, setDb, loading } = useRemoteDB();
-  const [date, setDate] = useState(todayISO());
 
   const [name, setName] = useState("");
   const [calories, setCalories] = useState(0);
@@ -13,9 +12,7 @@ export default function MealsPage(): JSX.Element {
   const [carbs, setCarbs] = useState(0);
   const [fat, setFat] = useState(0);
 
-  const dayEntry = useMemo(() => db.mealsByDay.find((m) => m.date === date) ?? null, [db.mealsByDay, date]);
-
-  const addRecipe = () => {
+  function addMealTemplate(): void {
     const clean = name.trim();
     if (!clean) return;
 
@@ -30,30 +27,36 @@ export default function MealsPage(): JSX.Element {
       },
     };
 
-    setDb((prev) => ({ ...prev, recipes: [recipe, ...prev.recipes] }));
+    setDb((prev) => ({
+      ...prev,
+      recipes: [recipe, ...(prev.recipes ?? [])],
+    }));
+
     setName("");
     setCalories(0);
     setProtein(0);
     setCarbs(0);
     setFat(0);
-  };
+  }
 
-  const toggleRecipeForDay = (recipeId: string) => {
+  function removeMealTemplate(recipeId: string): void {
     setDb((prev) => {
-      const existing = prev.mealsByDay.find((m) => m.date === date);
-      if (!existing) {
-        return { ...prev, mealsByDay: [{ id: uid("dayMeals"), date, recipeIds: [recipeId] }, ...prev.mealsByDay] };
-      }
-      const has = existing.recipeIds.includes(recipeId);
-      const nextIds = has ? existing.recipeIds.filter((id) => id !== recipeId) : [...existing.recipeIds, recipeId];
+      const nextRecipes = (prev.recipes ?? []).filter((recipe) => recipe.id !== recipeId);
+
+      const nextMealsByDay = (prev.mealsByDay ?? [])
+        .map((entry) => ({
+          ...entry,
+          items: (entry.items ?? []).filter((item) => item.recipeId !== recipeId),
+        }))
+        .filter((entry) => (entry.items ?? []).length > 0);
+
       return {
         ...prev,
-        mealsByDay: prev.mealsByDay.map((m) => (m.id === existing.id ? { ...m, recipeIds: nextIds } : m)),
+        recipes: nextRecipes,
+        mealsByDay: nextMealsByDay,
       };
     });
-  };
-
-  const plannedIds = new Set(dayEntry?.recipeIds ?? []);
+  }
 
   if (loading) {
     return (
@@ -66,22 +69,24 @@ export default function MealsPage(): JSX.Element {
   return (
     <div className="page">
       <header className="pageHeader">
-        <h1>Meal Logs</h1>
-        <p className="muted">Create recipes + nutrients, then add them to a day.</p>
+        <h1>Meals</h1>
+        <p className="muted">
+          Create reusable meal templates here. Add them to a day later from the dashboard.
+        </p>
       </header>
 
       <section className="card">
-        <label className="label">Meal date</label>
-        <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </section>
-
-      <section className="card">
-        <h2>Recipe Book</h2>
+        <h2>Create Meal</h2>
 
         <div className="stack">
           <div className="field">
-            <label className="label">Recipe name</label>
-            <input className="input" placeholder="e.g., Chicken + rice bowl" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="label">Meal name</label>
+            <input
+              className="input"
+              placeholder="e.g., Chicken + rice bowl"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
 
           <div className="grid4">
@@ -91,39 +96,41 @@ export default function MealsPage(): JSX.Element {
             <NutrientField label="Fat (g)" value={fat} onChange={setFat} />
           </div>
 
-          <button className="btn" onClick={addRecipe}>
-            Add Recipe
+          <button className="btn" onClick={addMealTemplate}>
+            Save Meal
           </button>
         </div>
       </section>
 
       <section className="card">
-        <h2>Plan / Log for {date}</h2>
+        <h2>Saved Meals</h2>
 
-        {db.recipes.length === 0 ? (
-          <p className="muted">No recipes yet. Add one above.</p>
+        {(db.recipes ?? []).length === 0 ? (
+          <p className="muted">No meals yet. Create one above.</p>
         ) : (
           <div className="stack">
-            {db.recipes.map((r) => {
-              const selected = plannedIds.has(r.id);
-              return (
-                <button
-                  key={r.id}
-                  className={`selectRow ${selected ? "selected" : ""}`}
-                  onClick={() => toggleRecipeForDay(r.id)}
-                >
-                  <div className="rowBetween">
-                    <div>
-                      <div className="itemTitle">{r.name}</div>
-                      <div className="muted small">
-                        {r.nutrients.calories} cal • P {r.nutrients.protein} • C {r.nutrients.carbs} • F {r.nutrients.fat}
-                      </div>
+            {(db.recipes ?? []).map((recipe) => (
+              <div key={recipe.id} className="subCard">
+                <div className="rowBetween">
+                  <div>
+                    <div className="itemTitle">{recipe.name}</div>
+                    <div className="muted small">
+                      {recipe.nutrients.calories} cal • P {recipe.nutrients.protein} • C{" "}
+                      {recipe.nutrients.carbs} • F {recipe.nutrients.fat}
                     </div>
-                    <span className="pill">{selected ? "Added" : "Add"}</span>
+                    {recipe.notes ? <div className="muted small">{recipe.notes}</div> : null}
                   </div>
-                </button>
-              );
-            })}
+
+                  <button
+                    type="button"
+                    className="btnGhost"
+                    onClick={() => removeMealTemplate(recipe.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </section>
@@ -131,7 +138,11 @@ export default function MealsPage(): JSX.Element {
   );
 }
 
-function NutrientField(props: { label: string; value: number; onChange: (n: number) => void }): JSX.Element {
+function NutrientField(props: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+}): JSX.Element {
   return (
     <div className="field">
       <label className="label">{props.label}</label>
