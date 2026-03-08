@@ -108,6 +108,12 @@ textarea {
   margin-top: 12px;
 }
 
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .pageHeader {
   gap: 6px;
 }
@@ -479,13 +485,11 @@ textarea.input:focus {
   z-index: 900;
   background: linear-gradient(180deg, rgba(8, 11, 20, 0.92), rgba(8, 11, 20, 0.7));
   backdrop-filter: blur(12px);
-  padding: 10px 32px 8px;
-  padding-right: 80px;
-  padding-left: 80px;
+  padding: 10px 24px 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
 .brandGhost {
@@ -505,12 +509,15 @@ textarea.input:focus {
 .topNav {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .navBubbles {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .navBubble {
@@ -532,6 +539,7 @@ textarea.input:focus {
 .navBubble .navIcon {
   font-size: 17px;
   line-height: 1;
+  padding-right: 4px;
 }
 
 .navBubble .navLabel {
@@ -565,6 +573,37 @@ textarea.input:focus {
   .exerciseEditorGrid,
   .setEditorGrid {
     grid-template-columns: 1fr;
+  }
+
+  .topNavShell {
+    padding: 10px 12px 8px;
+    gap: 8px;
+  }
+
+  .navBubble {
+    width: 42px;
+    height: 42px;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .weekGrid {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(240px, 90vw);
+    grid-template-columns: unset;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .weekGrid > button {
+    scroll-snap-align: start;
+    min-height: 140px;
   }
 }
 

@@ -403,6 +403,11 @@ export default function CalendarPage(): JSX.Element {
     setDate(formatISODate(addDays(weekStart, 7)));
   };
 
+  const goToToday = () => {
+    const today = todayISO();
+    setDate(today);
+  };
+
   return (
     <div className="page">
       <header className="pageHeader">
@@ -427,7 +432,7 @@ export default function CalendarPage(): JSX.Element {
             <div className="muted small">{formatRangeLabel(weekStart, weekEnd)}</div>
           </div>
 
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button
               type="button"
               className="ghostButton"
@@ -435,6 +440,14 @@ export default function CalendarPage(): JSX.Element {
               aria-label="Previous week"
             >
               ←
+            </button>
+            <button
+              type="button"
+              className="ghostButton"
+              onClick={goToToday}
+              aria-label="Go to today"
+            >
+              Today
             </button>
             <button
               type="button"
@@ -447,13 +460,7 @@ export default function CalendarPage(): JSX.Element {
           </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
-            gap: "10px",
-          }}
-        >
+        <div className="weekGrid">
           {weekDays.map((day) => {
             const iso = formatISODate(day);
             const isSelected = iso === date;
@@ -504,6 +511,10 @@ export default function CalendarPage(): JSX.Element {
 
       <p className="muted small" style={{ marginTop: "8px" }}>
         Viewing: <b>{selectedLabel}</b>
+      </p>
+
+      <p className="muted small">
+        Tip: Build workout templates in <b>Workouts</b> and add recipes/meals in <b>Meals</b>.
       </p>
 
       <section className="grid2">
@@ -643,10 +654,6 @@ export default function CalendarPage(): JSX.Element {
           )}
         </div>
       </section>
-
-      <p className="muted small">
-        Tip: Build workout templates in <b>Workouts</b> and add recipes/meals in <b>Meals</b>.
-      </p>
 
       {isWorkoutModalOpen ? (
         <div className="modalOverlay" onClick={closeWorkoutModal}>
