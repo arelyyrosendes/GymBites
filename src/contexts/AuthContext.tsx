@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode, type JSX } from "react";
 import type { User } from "firebase/auth";
 import {
   GoogleAuthProvider,
